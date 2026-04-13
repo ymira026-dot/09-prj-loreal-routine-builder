@@ -1,4 +1,5 @@
 /* Get references to DOM elements */
+const productSearch = document.getElementById("productSearch");
 const categoryFilter = document.getElementById("categoryFilter");
 const productsContainer = document.getElementById("productsContainer");
 const chatForm = document.getElementById("chatForm");
@@ -16,6 +17,8 @@ let selectedProducts = [];
 let generatedRoutine = "";
 let selectedProductsAtGeneration = [];
 let conversationHistory = [];
+let activeCategory = "";
+let searchQuery = "";
 
 const SELECTED_PRODUCTS_STORAGE_KEY = "selectedProductIds";
 const OPENAI_PROXY_URL = "https://loreal-chatbot.ymira026.workers.dev/";
@@ -65,7 +68,7 @@ function clearAllSelections() {
 /* Show initial placeholder until user selects a category */
 productsContainer.innerHTML = `
   <div class="placeholder-message">
-    Select a category to view products
+    Select a category or search for a product to view results
   </div>
 `;
 
@@ -74,6 +77,52 @@ async function loadProducts() {
   const response = await fetch("products.json");
   const data = await response.json();
   return data.products;
+}
+
+/* Filter products by category and search text */
+function getFilteredProducts() {
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  return allProducts.filter((product) => {
+    const matchesCategory =
+      !activeCategory || product.category === activeCategory;
+
+    if (!matchesCategory) {
+      return false;
+    }
+
+    if (!normalizedSearchQuery) {
+      return true;
+    }
+
+    const searchableText = [
+      product.name,
+      product.brand,
+      product.category,
+      product.description,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return searchableText.includes(normalizedSearchQuery);
+  });
+}
+
+/* Refresh the visible products using the current filters */
+function updateDisplayedProducts() {
+  const normalizedSearchQuery = searchQuery.trim();
+
+  if (!activeCategory && normalizedSearchQuery === "") {
+    productsContainer.innerHTML = `
+      <div class="placeholder-message">
+        Select a category or search for a product to view results
+      </div>
+    `;
+    return;
+  }
+
+  const filteredProducts = getFilteredProducts();
+  displayProducts(filteredProducts);
 }
 
 /* Create tags shown in the Selected Products section */
@@ -246,9 +295,21 @@ function displayProducts(products) {
   visibleProducts = products;
 
   if (products.length === 0) {
+    const hasCategory = Boolean(activeCategory);
+    const hasSearch = searchQuery.trim() !== "";
+    let emptyMessage = "No products found.";
+
+    if (hasCategory && hasSearch) {
+      emptyMessage = "No products found for that category and search term.";
+    } else if (hasCategory) {
+      emptyMessage = "No products found for this category.";
+    } else if (hasSearch) {
+      emptyMessage = "No products match your search.";
+    }
+
     productsContainer.innerHTML = `
       <div class="placeholder-message">
-        No products found for this category
+        ${emptyMessage}
       </div>
     `;
     return;
@@ -292,15 +353,14 @@ function displayProducts(products) {
 
 /* Filter and display products when category changes */
 categoryFilter.addEventListener("change", async (e) => {
-  const selectedCategory = e.target.value;
+  activeCategory = e.target.value;
+  updateDisplayedProducts();
+});
 
-  /* filter() creates a new array containing only products 
-     where the category matches what the user selected */
-  const filteredProducts = allProducts.filter(
-    (product) => product.category === selectedCategory,
-  );
-
-  displayProducts(filteredProducts);
+/* Filter products as the user types in the search field */
+productSearch.addEventListener("input", (e) => {
+  searchQuery = e.target.value;
+  updateDisplayedProducts();
 });
 
 /* Toggle selection when user clicks a product card */
@@ -377,6 +437,7 @@ async function init() {
   restoreSelectedProductsFromStorage();
   renderSelectedProducts();
   renderChatPlaceholder();
+  updateDisplayedProducts();
 }
 
 init();
