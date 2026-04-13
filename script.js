@@ -18,12 +18,7 @@ let selectedProductsAtGeneration = [];
 let conversationHistory = [];
 
 const SELECTED_PRODUCTS_STORAGE_KEY = "selectedProductIds";
-
-/* Read and validate API key from secrets.js */
-function getApiKey() {
-  const key = window.OPENAI_API_KEY?.trim();
-  return key || "";
-}
+const OPENAI_PROXY_URL = "https://loreal-chatbot.ymira026.workers.dev/";
 
 /* Save selected product IDs so selections survive page reloads */
 function saveSelectedProductsToStorage() {
@@ -171,24 +166,14 @@ ${JSON.stringify(selectedProductsAtGeneration, null, 2)}
 Keep answers clear, beginner-friendly, and concise.`;
 }
 
-/* Ask OpenAI with full conversation history */
+/* Send chat messages through the Cloudflare Worker */
 async function requestChatCompletion(systemMessage, messages) {
-  const apiKey = getApiKey();
-
-  if (!apiKey) {
-    throw new Error(
-      "OpenAI API key not found. Add OPENAI_API_KEY in secrets.js to continue.",
-    );
-  }
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetch(OPENAI_PROXY_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o",
       messages: [{ role: "system", content: systemMessage }, ...messages],
       temperature: 0.7,
     }),
@@ -217,14 +202,6 @@ async function generateRoutineFromSelectedProducts() {
     appendChatMessage(
       "assistant",
       "Select at least one product before generating a routine.",
-    );
-    return;
-  }
-
-  if (!getApiKey()) {
-    appendChatMessage(
-      "assistant",
-      "OpenAI API key not found. Add OPENAI_API_KEY in secrets.js to generate a routine.",
     );
     return;
   }
@@ -418,15 +395,6 @@ chatForm.addEventListener("submit", async (e) => {
     appendChatMessage(
       "assistant",
       "Generate a routine first, then ask follow-up questions about it.",
-    );
-    userInput.value = "";
-    return;
-  }
-
-  if (!getApiKey()) {
-    appendChatMessage(
-      "assistant",
-      "OpenAI API key not found. Add OPENAI_API_KEY in secrets.js to continue chatting.",
     );
     userInput.value = "";
     return;
